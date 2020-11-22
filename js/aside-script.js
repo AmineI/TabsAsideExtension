@@ -240,6 +240,7 @@ function AddCollection(collection)
 					"<button loc_alt='more' class='btn more' title='More...'>&#xE10C;</button>" +
 					"<nav>" +
 						"<button loc='restoreNoRemove' class='restoreCollection noDelete'>Restore without removing</button>" +
+						"<button loc='saveCollectionAsBookmarks' class='saveCollectionAsBookmarks'>Save as bookmarks</button>" +
 					"</nav>" +
 				"</div>" +
 				"<button loc_alt='removeCollection' class='btn remove' title='Remove collection'>&#xE10A;</button>" +
@@ -259,6 +260,9 @@ function AddCollection(collection)
 
 	list.querySelectorAll(".restoreCollection.noDelete").forEach(i =>
 		i.onclick = () => RestoreTabs(i.parentElement.parentElement.parentElement.parentElement, false));
+
+	list.querySelectorAll(".saveCollectionAsBookmarks").forEach(i =>
+		i.onclick = () => SaveCollectionAsBookmarks(i.parentElement.parentElement.parentElement.parentElement));
 
 	list.querySelectorAll(".set > div").forEach(i =>
 		i.onclick = (args) =>
@@ -293,6 +297,17 @@ function RenameCollection(collectionData, name)
 			newName: name,
 			collectionIndex: Array.prototype.slice.call(collectionData.parentElement.children).indexOf(collectionData) - 1
 		});
+}
+
+function SaveCollectionAsBookmarks(collectionData)
+{
+	chrome.runtime.sendMessage(
+		{
+			command: "SaveCollectionAsBookmarks",
+			collectionKey: collectionData.id
+		},
+		() => alert(chrome.i18n.getMessage("collectionSavedAsBookmarks"))
+	);
 }
 
 function RestoreTabs(collectionData, removeCollection = true)

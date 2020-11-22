@@ -154,6 +154,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) =>
 			collections[message.collectionIndex].name = message.newName;
 			localStorage.setItem("sets", JSON.stringify(collections));
 			break;
+		case "SaveCollectionAsBookmarks":
+			SaveCollectionAsBookmarks(collections[message.collectionKey]);
+			sendResponse();
+			break;
 		case "togglePane":
 			chrome.tabs.query(
 				{
