@@ -100,7 +100,7 @@ function Initialize()
 			})
 	);
 
-	// Exntension browser icon action
+	// Extension browser icon action
 	var swapIconAction = document.querySelector("#swapIconAction");
 	chrome.storage.sync.get(
 		{ "setAsideOnClick": false },
@@ -190,11 +190,20 @@ function Initialize()
 				window.open(i.value, "_blank");
 		});
 
-	chrome.runtime.sendMessage({ command: "loadData" }, (collections) =>
+
+	chrome.runtime.sendMessage({ command: "loadData" }, ({collections,thumbnails}) =>
 	{
-		if (document.querySelector(".tabsAside.pane section div") == null)
-			collections.forEach(i =>
-				AddCollection(i));
+		ReloadCollections(collections,thumbnails)
+	});
+
+	chrome.runtime.onMessage.addListener((message, sender, sendResponse) =>
+	{
+		switch (message.command)
+		{
+			case "reloadCollections":
+				ReloadCollections(message.collections,message.thumbnails);
+				break;
+		}
 	});
 
 	setTimeout(() => pane.setAttribute("opened", ""), 100);
@@ -211,7 +220,18 @@ function UpdateLocale()
 	);
 }
 
-function AddCollection(collection)
+
+function ReloadCollections(collections,thumbnails){
+				document.querySelector(".tabsAside section h2").removeAttribute("hidden");
+				document.querySelectorAll(".tabsAside section > div").forEach(i => i.remove());
+
+				if (document.querySelector(".tabsAside.pane section > div") == null)
+
+					for (const collection of Object.values(collections))
+							AddCollection(collection, thumbnails);
+}
+
+function AddCollection(collection,thumbnails)
 {
 	var list = document.querySelector(".tabsAside section");
 	list.querySelector("h2").setAttribute("hidden", "");
@@ -221,10 +241,10 @@ function AddCollection(collection)
 	for (var i = 0; i < collection.links.length; i++)
 	{
 		rawTabs +=
-			"<div title='" + collection.titles[i] + "'" + ((collection.thumbnails && collection.thumbnails[i]) ? " style='background-image: url(" + collection.thumbnails[i] + ")'" : "") + " value='" + collection.links[i] + "'>" +
+			"<div title='" + collection.titles[i] + "'" + ((thumbnails[collection.links[i]] && thumbnails[collection.links[i]].pageCapture) ? " style='background-image: url(" + thumbnails[collection.links[i]].pageCapture + ")'" : "") + " value='" + collection.links[i] + "'>" +
 				//"<span class='openTab' value='" + collection.links[i] + "'></span>" +
 				"<div>" +
-					"<div" + ((collection.icons[i] == 0 || collection.icons[i] == null) ? "" : " style='background-image: url(\"" + collection.icons[i] + "\")'") + "></div>" +
+					"<div" + ((thumbnails[collection.links[i]]?.iconUrl == 0 || thumbnails[collection.links[i]]?.iconUrl == null) ? "" : " style='background-image: url(\"" + thumbnails[collection.links[i]].iconUrl + "\")'") + "></div>" +
 					"<span>" + collection.titles[i] + "</span>" +
 					"<button loc_alt='removeTab' class='btn remove' title='Remove tab from collection'></button>" +
 				"</div>" +
@@ -232,7 +252,7 @@ function AddCollection(collection)
 	}
 
 	list.innerHTML +=
-		"<div class='collectionSet'>" +
+		"<div class='collectionSet' id='set_"+collection.timestamp+"'>" +
 			"<div class='header'>" +
 				"<input type='text' value='" + (collection.name ?? new Date(collection.timestamp).toDateString()) + "'/>" +
 				"<a loc='restoreTabs' class='restoreCollection'>Restore tabs</a>" +
@@ -252,7 +272,8 @@ function AddCollection(collection)
 	UpdateLocale();
 
 	list.querySelectorAll("input").forEach(i =>
-		i.oninput = (event) => RenameCollection(i.parentElement.parentElement, event.target.value));
+		i.addEventListener("focusout",(event) => RenameCollection(i.parentElement.parentElement, event.target.value)));
+	// i.onfocusout=func has issues on some browsers and needs to be implemented with an event listener - https://www.w3schools.com/jsref/event_onfocusout.asp
 
 	list.querySelectorAll(".restoreCollection").forEach(i =>
 		i.onclick = () => RestoreTabs(i.parentElement.parentElement));
@@ -291,7 +312,7 @@ function RenameCollection(collectionData, name)
 		{
 			command: "renameCollection",
 			newName: name,
-			collectionIndex: Array.prototype.slice.call(collectionData.parentElement.children).indexOf(collectionData) - 1
+			collectionKey: collectionData.id
 		});
 }
 
@@ -301,7 +322,7 @@ function RestoreTabs(collectionData, removeCollection = true)
 		{
 			command: "restoreTabs",
 			removeCollection: removeCollection,
-			collectionIndex: Array.prototype.slice.call(collectionData.parentElement.children).indexOf(collectionData) - 1
+			collectionKey: collectionData.id
 		},
 		() =>
 		{
@@ -321,7 +342,7 @@ function RemoveTabs(collectionData)
 		chrome.runtime.sendMessage(
 			{
 				command: "deleteTabs",
-				collectionIndex: Array.prototype.slice.call(collectionData.parentElement.children).indexOf(collectionData) - 1
+				collectionKey: collectionData.id
 			},
 			() => RemoveCollectionElement(collectionData)
 		);
@@ -338,7 +359,7 @@ function RemoveOneTab(tabData)
 		chrome.runtime.sendMessage(
 			{
 				command: "removeTab",
-				collectionIndex: Array.prototype.slice.call(tabData.parentElement.parentElement.parentElement.children).indexOf(tabData.parentElement.parentElement) - 1,
+				collectionKey: tabData.parentElement.parentElement.id,
 				tabIndex: Array.prototype.slice.call(tabData.parentElement.children).indexOf(tabData)
 			},
 			() =>
